@@ -1,8 +1,10 @@
 import io
 import os
 import sys
+import tempfile
 from pathlib import Path
 
+import cv2
 from pydantic import BaseModel
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
@@ -17,6 +19,7 @@ from PIL import Image, ImageDraw
 from src.core import YAMLConfig
 
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.webp', '.tiff', '.tif'}
+VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm'}
 
 # ---------------------------------------------------------------------------
 # 모델 설정 (서버 시작 시 환경변수 또는 기본값으로 로드)
@@ -215,6 +218,105 @@ def detect_image_dir(body: ImagePathRequest):
 
     return JSONResponse(status_code=400, content={"error": f"파일도 디렉토리도 아닙니다: {input_path}"})
 
+
+# ---------------------------------------------------------------------------
+# /detect/video  — 동영상 업로드 or 경로 처리
+# ---------------------------------------------------------------------------
+
+def _draw_on_frame_cv2(frame_bgr, detections):
+    for det in detections:
+        x1, y1, x2, y2 = [int(v) for v in det["box"]]
+        cv2.rectangle(frame_bgr, (x1, y1), (x2, y2), (0, 0, 255), 2)
+        text = f"{det['label']} {det['score']}"
+        cv2.putText(frame_bgr, text, (x1, max(y1 - 6, 0)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1, cv2.LINE_AA)
+    return frame_bgr
+
+
+def _process_video(src_path: str, threshold: float) -> str:
+    cap = cv2.VideoCapture(src_path)
+    if not cap.isOpened():
+        raise ValueError(f"동영상을 열 수 없습니다: {src_path}")
+
+    fps    = cap.get(cv2.CAP_PROP_FPS) or 30
+    width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    total  = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    stem = Path(src_path).stem
+    output_dir = Path(OUTPUT_BASE_DIR) / "video"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    save_path = str(output_dir / (stem + "_result.mp4"))
+
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(save_path, fourcc, fps, (width, height))
+
+    print(f"[INFO] 동영상 처리 시작: {Path(src_path).name} ({width}x{height}, {fps:.1f}fps, {total}프레임)")
+    frame_idx = 0
+    while True:
+        ret, frame_bgr = cap.read()
+        if not ret:
+            break
+        frame_idx += 1
+        if frame_idx % 30 == 0 or frame_idx == 1:
+            print(f"  처리 중: {frame_idx}/{total} 프레임")
+
+        frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        im_pil = Image.fromarray(frame_rgb)
+        detections = run_inference(im_pil, threshold)
+        _draw_on_frame_cv2(frame_bgr, detections)
+        writer.write(frame_bgr)
+
+    cap.release()
+    writer.release()
+    print(f"[INFO] 완료 → {save_path}")
+    return save_path
+
+
+class VideoPathRequest(BaseModel):
+    video_path: str
+    threshold: float = 0.6
+
+
+@app.post("/detect/video/upload", summary="동영상 업로드 → 처리 후 output 저장")
+async def detect_video_upload(
+    file: UploadFile = File(...),
+    threshold: float = Query(0.6, ge=0.0, le=1.0, description="신뢰도 임계값"),
+):
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in VIDEO_EXTENSIONS:
+        return JSONResponse(status_code=400, content={"error": f"지원하지 않는 동영상 형식: {suffix}"})
+
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        save_path = _process_video(tmp_path, threshold)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    finally:
+        os.unlink(tmp_path)
+
+    rel = Path(save_path).relative_to(Path(OUTPUT_BASE_DIR))
+    return JSONResponse({"saved": save_path, "url": f"/output/{rel}"})
+
+
+@app.post("/detect/video", summary="동영상 경로 → 처리 후 output 저장")
+def detect_video(body: VideoPathRequest):
+    video_path = Path(body.video_path)
+    if not video_path.exists():
+        return JSONResponse(status_code=400, content={"error": f"경로가 존재하지 않습니다: {video_path}"})
+    if video_path.suffix.lower() not in VIDEO_EXTENSIONS:
+        return JSONResponse(status_code=400, content={"error": f"지원하지 않는 동영상 형식: {video_path.suffix}"})
+
+    try:
+        save_path = _process_video(str(video_path), body.threshold)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+    rel = Path(save_path).relative_to(Path(OUTPUT_BASE_DIR))
+    return JSONResponse({"saved": save_path, "url": f"/output/{rel}"})
 
 
 @app.get("/health", summary="서버 상태 확인")
