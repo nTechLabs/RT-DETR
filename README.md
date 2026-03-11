@@ -151,3 +151,11 @@ directory
 
 fastapi
  ../../.venv/bin/uvicorn api.fastapi_main:app --host 0.0.0.0 --port 8000 --reload
+
+videos
+../../.venv/bin/python references/deploy/rtdetrv2_torch.py \
+  -c configs/rtdetrv2/rtdetrv2_r18vd_120e_coco.yml \
+  -r rtdetrv2_r18vd_120e_coco_rerun_48.1.pth \
+  -f ../videos/test.mp4 \
+  -d cuda:0 \
+  -t 0.5
