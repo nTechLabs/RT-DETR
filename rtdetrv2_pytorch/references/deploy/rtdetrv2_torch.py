@@ -1,13 +1,16 @@
 """Copyright(c) 2023 lyuwenyu. All Rights Reserved.
 """
 
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '../..'))
+
+import numpy as np
 import torch
-import torch.nn as nn 
+import torch.nn as nn
 import torchvision.transforms as T
-
-import numpy as np 
 from PIL import Image, ImageDraw
-
 from src.core import YAMLConfig
 
 
@@ -23,8 +26,11 @@ def draw(images, labels, boxes, scores, thrh = 0.6):
         for j,b in enumerate(box):
             draw.rectangle(list(b), outline='red',)
             draw.text((b[0], b[1]), text=f"{lab[j].item()} {round(scrs[j].item(),2)}", fill='blue', )
+            print(f"[image {i}] label={lab[j].item()}, score={round(scrs[j].item(),4)}, box={[round(x.item(),1) for x in b]}")
 
-        im.save(f'results_{i}.jpg')
+        save_path = f'results_{i}.jpg'
+        im.save(save_path)
+        print(f"[image {i}] saved -> {save_path}")
 
 
 def main(args, ):
@@ -33,7 +39,7 @@ def main(args, ):
     cfg = YAMLConfig(args.config, resume=args.resume)
 
     if args.resume:
-        checkpoint = torch.load(args.resume, map_location='cpu') 
+        checkpoint = torch.load(args.resume, map_location='cpu')
         if 'ema' in checkpoint:
             state = checkpoint['ema']['module']
         else:
@@ -49,7 +55,7 @@ def main(args, ):
             super().__init__()
             self.model = cfg.model.deploy()
             self.postprocessor = cfg.postprocessor.deploy()
-            
+
         def forward(self, images, orig_target_sizes):
             outputs = self.model(images)
             outputs = self.postprocessor(outputs, orig_target_sizes)

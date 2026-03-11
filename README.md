@@ -29,7 +29,7 @@ English | [简体中文](README_cn.md)
 ---
 
 
-This is the official implementation of papers 
+This is the official implementation of papers
 - [DETRs Beat YOLOs on Real-time Object Detection](https://arxiv.org/abs/2304.08069)
 - [RT-DETRv2: Improved Baseline with Bag-of-Freebies for Real-Time Detection Transformer](https://arxiv.org/abs/2407.17140)
 
@@ -77,7 +77,7 @@ By harnessing the rapidly evolving capabilities of Vision Foundation Models (VFM
 - 🔥 RT-DETRv2
   - paddle: [code&weight](./rtdetrv2_paddle/)
   - pytorch: [code&weight](./rtdetrv2_pytorch/)
-- 🔥 RT-DETR 
+- 🔥 RT-DETR
   - paddle: [code&weight](./rtdetr_paddle)
   - pytorch: [code&weight](./rtdetr_pytorch)
 
@@ -129,12 +129,18 @@ If you use `RT-DETR` or `RTDETRv2` in your work, please use the following BibTeX
 }
 
 @misc{lv2024rtdetrv2improvedbaselinebagoffreebies,
-      title={RT-DETRv2: Improved Baseline with Bag-of-Freebies for Real-Time Detection Transformer}, 
+      title={RT-DETRv2: Improved Baseline with Bag-of-Freebies for Real-Time Detection Transformer},
       author={Wenyu Lv and Yian Zhao and Qinyao Chang and Kui Huang and Guanzhong Wang and Yi Liu},
       year={2024},
       eprint={2407.17140},
       archivePrefix={arXiv},
       primaryClass={cs.CV},
-      url={https://arxiv.org/abs/2407.17140}, 
+      url={https://arxiv.org/abs/2407.17140},
 }
 ```
+===============================================================================================
+python references/deploy/rtdetrv2_torch.py \
+  -c configs/rtdetrv2/rtdetrv2_r18vd_120e_coco.yml \
+  -r rtdetrv2_r18vd_120e_coco_rerun_48.1.pth \
+  --im-file /path/to/image.jpg \
+  --device cuda:0
