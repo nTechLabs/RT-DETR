@@ -139,8 +139,15 @@ If you use `RT-DETR` or `RTDETRv2` in your work, please use the following BibTeX
 }
 ```
 ===============================================================================================
+file
 python references/deploy/rtdetrv2_torch.py \
   -c configs/rtdetrv2/rtdetrv2_r18vd_120e_coco.yml \
   -r rtdetrv2_r18vd_120e_coco_rerun_48.1.pth \
   --im-file /path/to/image.jpg \
   --device cuda:0
+
+directory
+../../.venv/bin/python references/deploy/rtdetrv2_torch.py   -c configs/rtdetrv2/rtdetrv2_r18vd_120e_coco.yml   -r rtdetrv2_r18vd_120e_coco_rerun_48.1.pth   --im-file ../images --device cuda:0
+
+fastapi
+ ../../.venv/bin/uvicorn api.fastapi_main:app --host 0.0.0.0 --port 8000 --reload
